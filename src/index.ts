@@ -34,7 +34,6 @@ async function main() {
     });
 
     const structs = extractAllStructs(response.data);
-    console.dir(structs, { depth: null, colors: true });
     const interfaces = generateTypeScriptDTOs(structs);
     const outputDir = path.join(process.cwd(), 'generated');
     saveDTOsToFiles(interfaces, outputDir);

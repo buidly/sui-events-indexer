@@ -8,6 +8,31 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum buildings_BuildingId {
+  ArmsDealership
+  ClubHouse
+  CounterfeitOperation
+  Defense
+  SmugglingDen
+}
+
+enum lotto_LottoStatusEnum {
+  COMPLETED
+  ONGOING
+}
+
+enum safe_GuessEnum {
+  FAILED
+  HIGHER
+  LOWER
+  WON
+}
+
+enum safe_StatusEnum {
+  ACTIVE
+  CLOSED
+}
+
 model battle_simulator_CalculatedDamageObj {
   dbId String @id @unique @default(uuid())
   damage Int
@@ -82,10 +107,10 @@ model bps_BPS {
 model buildings_BaseCost {
   dbId String @id @unique @default(uuid())
   money String
-  weapon Json
+  weapon String?
   building_name String
   influence String
-  contraband Json
+  contraband String?
   cool_down_time String
   upkeep_cost String
 }
@@ -96,10 +121,6 @@ model buildings_BaseCostRate {
   counterfeit_operation Json
   arms_dealership Json
   club_house Json
-}
-
-model buildings_BuildingId {
-  dbId String @id @unique @default(uuid())
 }
 
 model buildings_BuildingInfo {
@@ -162,7 +183,7 @@ model family_Family {
   join_limit Int
   description String
   boss String
-  under_boss Json
+  under_boss String?
 }
 
 model lotto_Lotto {
@@ -172,7 +193,7 @@ model lotto_Lotto {
   amount_collected String
   result_in String
   lotto_type String
-  status Json
+  status lotto_LottoStatusEnum @default(COMPLETED)
   winner Json[]
   sold Json
   winner_list String[]
@@ -191,13 +212,9 @@ model lotto_LottoSold {
   amount String
 }
 
-model lotto_LottoStatusEnum {
-  dbId String @id @unique @default(uuid())
-}
-
 model lotto_PrevWinner {
   dbId String @id @unique @default(uuid())
-  player_info_id Json
+  player_info_id String?
   amount String
 }
 
@@ -351,28 +368,24 @@ model role_AdminCap {
   id String
 }
 
-model safe_GuessEnum {
-  dbId String @id @unique @default(uuid())
-}
-
 model safe_PrevStatus {
   dbId String @id @unique @default(uuid())
   prevMoney String
-  prevWonAddr Json
+  prevWonAddr String?
 }
 
 model safe_Safe {
   dbId String @id @unique @default(uuid())
   id String
-  cracked_safe Json
+  cracked_safe String?
   start_timestamp String
   decreases_rate String
   logs Json
   money_won String
   upper_bound String
   lower_bound String
-  status Json
-  prev_player_status Json
+  status safe_StatusEnum @default(ACTIVE)
+  prev_player_status Json?
   min_threshold String
   max_threshold String
 }
@@ -381,7 +394,7 @@ model safe_SafeLog {
   dbId String @id @unique @default(uuid())
   tried_at String
   number_guessed String
-  guess Json
+  guess safe_GuessEnum?
   cooldown_timestamp String
 }
 
@@ -389,10 +402,6 @@ model safe_SafeMappingWithId {
   dbId String @id @unique @default(uuid())
   id String
   safes Json
-}
-
-model safe_StatusEnum {
-  dbId String @id @unique @default(uuid())
 }
 
 model search_item_ResultSearchItem {
@@ -472,7 +481,7 @@ model turf_information_SharedTurfInformation {
   id String
   turf_id String
   axis Json
-  owned_by_player_id Json
+  owned_by_player_id String?
   garrison Json
   coordinates Json[]
   center String[]
