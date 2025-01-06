@@ -1,13 +1,17 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "module": "commonjs",
-    "strict": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
     "esModuleInterop": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "strict": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "outDir": "dist"
   },
-  "include": ["src/**/*"]
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifiers": true
+  }
 } 

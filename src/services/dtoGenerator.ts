@@ -2,38 +2,43 @@ import { DTOInterface } from '../types/dto-interface';
 import { mapNormalizedTypeToTypeScript } from '../utils/typeMapper';
 
 export const extractAllStructs = (response: any): Record<string, any> => {
-  const result: Record<string, any> = {};
+  try {
+    const result: Record<string, any> = {};
 
-  for (const [moduleName, moduleData] of Object.entries(response.result)) {
-    const module = moduleData as {
-      structs?: Record<string, any>;
-      enums?: Record<string, any>;
-    };
+    for (const [moduleName, moduleData] of Object.entries(response)) {
+      const module = moduleData as {
+        structs?: Record<string, any>;
+        enums?: Record<string, any>;
+      };
 
-    // Handle structs
-    if (module.structs) {
-      for (const [structName, structDef] of Object.entries(module.structs)) {
-        const uniqueName = `${moduleName}_${structName}`;
-        result[uniqueName] = {
-          type: 'struct',
-          ...structDef,
-        };
+      // Handle structs
+      if (module.structs && Object.keys(module.structs).length > 0) {
+        for (const [structName, structDef] of Object.entries(module.structs)) {
+          const uniqueName = `${moduleName}_${structName}`;
+          result[uniqueName] = {
+            type: 'struct',
+            ...structDef,
+          };
+        }
+      }
+
+      // Handle enums
+      if (module.enums && Object.keys(module.enums).length > 0) {
+        for (const [enumName, enumDef] of Object.entries(module.enums)) {
+          const uniqueName = `${moduleName}_${enumName}`;
+          result[uniqueName] = {
+            type: 'enum',
+            values: Object.keys(enumDef.variants),
+          };
+        }
       }
     }
 
-    // Handle enums
-    if (module.enums) {
-      for (const [enumName, enumDef] of Object.entries(module.enums)) {
-        const uniqueName = `${moduleName}_${enumName}`;
-        result[uniqueName] = {
-          type: 'enum',
-          values: Object.keys(enumDef.variants),
-        };
-      }
-    }
+    return result;
+  } catch (error) {
+    console.error('Error extracting structs and enums:', error);
+    return {};
   }
-
-  return result;
 };
 
 export const generateTypeScriptDTOs = (

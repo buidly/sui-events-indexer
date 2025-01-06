@@ -1,40 +1,61 @@
 import axios from 'axios';
-import path from 'path';
-import fs from 'fs';
-import { execSync } from 'child_process';
+import {
+  extractEventTypes,
+  filterEventStructsAndDependencies,
+} from './services/eventExtractor';
+import { cleanupDatabase } from './utils/databaseCleanup';
 import {
   extractAllStructs,
   generateTypeScriptDTOs,
 } from './services/dtoGenerator';
-import { saveDTOsToFiles } from './utils/fileSystem';
+import path from 'path';
 import { generatePrismaSchema } from './utils/prismaSchemaGenerator';
-import { cleanupDatabase } from './utils/databaseCleanup';
+import { saveDTOsToFiles } from './utils/fileSystem';
+import { execSync } from 'child_process';
+import fs from 'fs';
+import { SuiClient } from './services/suiClient';
 
 async function main() {
-  const url = 'https://fullnode.devnet.sui.io:443';
-
-  const requestBody = {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'sui_getNormalizedMoveModulesByPackage',
-    params: [
-      '0x816b07586fc507ee9c96e1faeba5713c0f96e0e4441b9a046db0f75a344e0984',
-    ],
-  };
+  const rpcUrl = 'https://fullnode.mainnet.sui.io:443';
+  const packageId =
+    '0x6f5e582ede61fe5395b50c4a449ec11479a54d7ff8e0158247adfda60d98970b';
+  const suiClient = new SuiClient(rpcUrl);
 
   try {
     // Clean up everything first
     cleanupDatabase();
 
-    // Fetch and generate TypeScript DTOs
-    const response = await axios.post(url, requestBody, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const packageData = await suiClient.getNormalizedMoveModulesByPackage(
+      packageId,
+    );
 
-    const structs = extractAllStructs(response.data);
-    const interfaces = generateTypeScriptDTOs(structs);
+    const object = await suiClient.getObject(packageId);
+    const bytecode = object?.result?.data?.content?.disassembled;
+
+    if (!bytecode) {
+      console.error('No bytecode found');
+      return;
+    }
+
+    // Extract event types from bytecode
+    const { eventTypes, externalPackages } = extractEventTypes(bytecode);
+
+    // Extract all structs from module data
+    const allStructs = extractAllStructs(packageData);
+
+    // Filter structs to only include event types and their dependencies
+    const eventStructs = await filterEventStructsAndDependencies(
+      allStructs,
+      eventTypes,
+      externalPackages,
+      suiClient,
+    );
+
+    console.dir(eventStructs, { depth: null });
+    return;
+
+    // Generate interfaces
+    const interfaces = generateTypeScriptDTOs(eventStructs);
     const outputDir = path.join(process.cwd(), 'generated');
     saveDTOsToFiles(interfaces, outputDir);
 
@@ -46,7 +67,7 @@ async function main() {
     );
     console.log('Generated Prisma schema');
 
-    // Apply schema directly without migrations
+    // Apply schema
     try {
       execSync('npx prisma generate', { stdio: 'inherit' });
       execSync('npx prisma db push --force-reset', { stdio: 'inherit' });
