@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
 interface Field {
   name: string;
@@ -26,9 +25,115 @@ const typeMapping: Record<string, string> = {
   bigint: 'BigInt',
 };
 
-export const generatePrismaSchema = (generatedDir: string): string => {
-  const { models, enums } = parseTypeScriptInterfaces(generatedDir);
-  return generateSchema(models, enums);
+const generateSchemaHeader = (): string => `
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+`;
+
+const parseEnumValues = (lines: string[]): string[] => {
+  const enumValues: string[] = [];
+  let isInEnum = false;
+
+  for (const line of lines) {
+    if (line.includes('export enum')) {
+      isInEnum = true;
+      continue;
+    }
+    if (isInEnum && line.includes('}')) {
+      break;
+    }
+    if (isInEnum) {
+      const match = line.match(/^\s*(\w+)[\s,]*$/);
+      if (match) {
+        enumValues.push(match[1]);
+      }
+    }
+  }
+
+  return enumValues;
+};
+
+const parseField = (line: string): Field | null => {
+  const match = line.match(/^\s*(\w+):\s*(.+);$/);
+  if (!match) return null;
+
+  const [, name, type] = match;
+  const isArray = type.endsWith('[]');
+  const isOptional = type.includes('?') || type.includes('| null');
+
+  // Clean up the type
+  const baseType = type
+    .replace('[]', '')
+    .replace('?', '')
+    .replace('| null', '')
+    .replace(' | null', '')
+    .trim();
+
+  return {
+    name,
+    type: baseType,
+    isArray,
+    isOptional,
+  };
+};
+
+const generateEnumDefinitions = (enums: EnumDefinition[]): string => {
+  let schema = '';
+  for (const enumDef of enums) {
+    schema += `\nenum ${enumDef.name} {\n`;
+    for (const value of enumDef.values) {
+      schema += `  ${value}\n`;
+    }
+    schema += '}\n';
+  }
+  return schema;
+};
+
+const generateModelField = (field: Field, enums: EnumDefinition[]): string => {
+  const enumDef = enums.find(
+    (e) => e.name === field.type || e.name === field.type.replace(/\[\]$/, ''),
+  );
+  const isEnum = !!enumDef;
+
+  const baseType = isEnum
+    ? field.type.replace(/\[\]$/, '')
+    : typeMapping[field.type.toLowerCase()] || 'Json';
+  const fieldType = `${baseType}${field.isArray ? '[]' : ''}`;
+
+  if (
+    isEnum &&
+    !field.isOptional &&
+    !field.isArray &&
+    enumDef.values.length > 0
+  ) {
+    return `  ${field.name} ${fieldType} @default(${enumDef.values[0]})\n`;
+  }
+
+  return `  ${field.name} ${fieldType}${field.isOptional ? '?' : ''}\n`;
+};
+
+const generateModelDefinitions = (
+  models: ModelDefinition[],
+  enums: EnumDefinition[],
+): string => {
+  let schema = '';
+  for (const model of models) {
+    schema += `\nmodel ${model.name} {\n`;
+    schema += '  dbId String @id @unique @default(uuid())\n';
+
+    for (const field of model.fields) {
+      schema += generateModelField(field, enums);
+    }
+
+    schema += '}\n';
+  }
+  return schema;
 };
 
 const parseTypeScriptInterfaces = (
@@ -43,26 +148,7 @@ const parseTypeScriptInterfaces = (
     const name = path.basename(file, '.ts');
 
     if (content.includes('export enum')) {
-      const enumValues: string[] = [];
-      const lines = content.split('\n');
-      let isInEnum = false;
-
-      for (const line of lines) {
-        if (line.includes('export enum')) {
-          isInEnum = true;
-          continue;
-        }
-        if (isInEnum && line.includes('}')) {
-          break;
-        }
-        if (isInEnum) {
-          const match = line.match(/^\s*(\w+)[\s,]*$/);
-          if (match) {
-            enumValues.push(match[1]);
-          }
-        }
-      }
-
+      const enumValues = parseEnumValues(content.split('\n'));
       if (enumValues.length > 0) {
         enums.push({ name, values: enumValues });
       }
@@ -71,25 +157,9 @@ const parseTypeScriptInterfaces = (
       const lines = content.split('\n');
 
       for (const line of lines) {
-        const match = line.match(/^\s*(\w+):\s*(.+);$/);
-        if (match) {
-          const [, name, type] = match;
-          const isArray = type.endsWith('[]');
-          const isOptional = type.includes('?') || type.includes('| null');
-
-          // Clean up the type by removing array notation, optional markers, and union with null
-          let baseType = type
-            .replace('[]', '')
-            .replace('?', '')
-            .replace(' | null', '')
-            .trim();
-
-          fields.push({
-            name,
-            type: baseType,
-            isArray,
-            isOptional,
-          });
+        const field = parseField(line);
+        if (field) {
+          fields.push(field);
         }
       }
 
@@ -102,67 +172,12 @@ const parseTypeScriptInterfaces = (
   return { models, enums };
 };
 
-const generateSchema = (
-  models: ModelDefinition[],
-  enums: EnumDefinition[],
-): string => {
-  console.dir(enums, { depth: null });
-  console.dir(models, { depth: null });
-  let schema = `
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+export const generatePrismaSchema = (generatedDir: string): string => {
+  const { models, enums } = parseTypeScriptInterfaces(generatedDir);
 
-generator client {
-  provider = "prisma-client-js"
-}
-`;
-
-  // First generate enums
-  for (const enumDef of enums) {
-    schema += `\nenum ${enumDef.name} {\n`;
-    for (const value of enumDef.values) {
-      schema += `  ${value}\n`;
-    }
-    schema += '}\n';
-  }
-
-  // Then generate models
-  for (const model of models) {
-    schema += `\nmodel ${model.name} {\n`;
-    schema += '  dbId String @id @unique @default(uuid())\n';
-
-    for (const field of model.fields) {
-      // Check if this type is an enum by looking for it in our enums array
-      const enumDef = enums.find(
-        (e) =>
-          e.name === field.type || e.name === field.type.replace(/\[\]$/, ''),
-      );
-      const isEnum = !!enumDef;
-
-      const baseType = isEnum
-        ? field.type.replace(/\[\]$/, '')
-        : typeMapping[field.type.toLowerCase()] || 'Json';
-      const fieldType = `${baseType}${field.isArray ? '[]' : ''}`;
-
-      // For enums, add a default value if it's not optional and not an array
-      if (
-        isEnum &&
-        !field.isOptional &&
-        !field.isArray &&
-        enumDef.values.length > 0
-      ) {
-        schema += `  ${field.name} ${fieldType} @default(${enumDef.values[0]})\n`;
-      } else {
-        schema += `  ${field.name} ${fieldType}${
-          field.isOptional ? '?' : ''
-        }\n`;
-      }
-    }
-
-    schema += '}\n';
-  }
-
-  return schema;
+  return [
+    generateSchemaHeader(),
+    generateEnumDefinitions(enums),
+    generateModelDefinitions(models, enums),
+  ].join('\n');
 };
