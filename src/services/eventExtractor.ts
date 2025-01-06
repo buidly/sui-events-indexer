@@ -7,7 +7,7 @@ export const extractEventTypes = (
   const eventTypes = new Set<string>();
   const externalPackages = new Map<string, string>();
 
-  for (const moduleBytecode of Object.values(bytecode)) {
+  for (const [moduleName, moduleBytecode] of Object.entries(bytecode)) {
     const lines = moduleBytecode.split('\n');
 
     // Collect all `use` statements for external packages
@@ -24,7 +24,7 @@ export const extractEventTypes = (
       const emitMatch = line.match(/event::emit<([\w_]+)>/);
       if (emitMatch) {
         const eventType = emitMatch[1];
-        eventTypes.add(eventType);
+        eventTypes.add(`${moduleName}_${eventType}`);
       }
     }
   }
@@ -51,7 +51,7 @@ export const filterEventStructsAndDependencies = async (
     // If not found in allStructs, try to find in external packages
     if (!struct) {
       // Parse type name to get module and name (assuming format "module_name")
-      const [module, name] = type.split('_');
+      const [module, _] = type.split('_');
       if (externalPackages.has(module)) {
         const packageId = externalPackages.get(module)!;
 
@@ -75,14 +75,14 @@ export const filterEventStructsAndDependencies = async (
         for (const field of struct.fields) {
           const fieldType = field.type;
 
-          if (typeof fieldType === 'string') {
-            await collectDependencies(fieldType);
-          } else if (fieldType.Struct) {
+          if (fieldType.Struct) {
             const { module, name } = fieldType.Struct;
             const nestedType = `${module}_${name}`;
             await collectDependencies(nestedType);
-          } else if (fieldType.Vector) {
-            await collectDependencies(fieldType.Vector);
+          } else if (fieldType.Vector && fieldType.Vector.Struct) {
+            const { module, name } = fieldType.Vector.Struct;
+            const nestedType = `${module}_${name}`;
+            await collectDependencies(nestedType);
           }
         }
       }

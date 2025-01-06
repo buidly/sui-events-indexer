@@ -5,7 +5,7 @@ export const extractAllStructs = (response: any): Record<string, any> => {
   try {
     const result: Record<string, any> = {};
 
-    for (const [moduleName, moduleData] of Object.entries(response)) {
+    for (const [moduleName, moduleData] of Object.entries(response.result)) {
       const module = moduleData as {
         structs?: Record<string, any>;
         enums?: Record<string, any>;
