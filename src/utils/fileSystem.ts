@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { DTOInterface } from '../types/sui';
+import { DTOInterface } from '../types/dto-interface';
 
 export const saveDTOsToFiles = (
   dtos: DTOInterface[],

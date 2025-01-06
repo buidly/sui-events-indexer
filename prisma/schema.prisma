@@ -7,3 +7,552 @@ datasource db {
 generator client {
   provider = "prisma-client-js"
 }
+
+model battle_simulator_CalculatedDamageObj {
+  dbId String @id @unique @default(uuid())
+  damage Int
+  dieRoll String
+}
+
+model battle_simulator_GameStateObject {
+  dbId String @id @unique @default(uuid())
+  round Int
+  attacker_unit Json
+  defender_unit Json
+}
+
+model battle_simulator_GangsterDamageMultiplier {
+  dbId String @id @unique @default(uuid())
+  id String
+  multipliers Json
+}
+
+model battle_simulator_IBattleStatsWithID {
+  dbId String @id @unique @default(uuid())
+  unit_id String
+  die_roll_number String
+  health Int
+  total_health Int
+  buffs Json[]
+  debuffs Json[]
+  damage_given Int
+  damage_taken Int
+  is_dead Boolean
+}
+
+model battle_simulator_LogTest {
+  dbId String @id @unique @default(uuid())
+  id String
+  logs Json[]
+}
+
+model battle_simulator_ResultSimulationObject {
+  dbId String @id @unique @default(uuid())
+  battle_state Int
+  logs Json[]
+  attacker_units Json[]
+  defender_units Json[]
+}
+
+model battle_simulator_SharedBattleResult {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model battle_simulator_StatMultiplierObj {
+  dbId String @id @unique @default(uuid())
+  mux_type String
+  multiplier Int
+}
+
+model battle_simulator_UnitObject {
+  dbId String @id @unique @default(uuid())
+  unit_id String
+  unit_name String
+  read_health Int
+  cur_health Int
+  read_attack Int
+}
+
+model bps_BPS {
+  dbId String @id @unique @default(uuid())
+  pos0 String
+}
+
+model buildings_BaseCost {
+  dbId String @id @unique @default(uuid())
+  money String
+  weapon Json
+  building_name String
+  influence String
+  contraband Json
+  cool_down_time String
+  upkeep_cost String
+}
+
+model buildings_BaseCostRate {
+  dbId String @id @unique @default(uuid())
+  id String
+  counterfeit_operation Json
+  arms_dealership Json
+  club_house Json
+}
+
+model buildings_BuildingId {
+  dbId String @id @unique @default(uuid())
+}
+
+model buildings_BuildingInfo {
+  dbId String @id @unique @default(uuid())
+  current_level String
+  in_cooldown_till String
+  next_upgrade_cost Json
+  produces String
+  production_rate String
+  building_capacity String
+  upkeep Json
+}
+
+model buildings_UpKeep {
+  dbId String @id @unique @default(uuid())
+  resource_cost String
+  last_upkeep_ts String
+  upkeep_duration String
+}
+
+model buildings_UpdateInfo {
+  dbId String @id @unique @default(uuid())
+  level String
+  timestamp_ms String
+  rate String
+}
+
+model demo_TestEvent {
+  dbId String @id @unique @default(uuid())
+  value String
+  name String
+}
+
+model extortion_Extortion {
+  dbId String @id @unique @default(uuid())
+  id String
+  player String
+  resource_type String
+}
+
+model extortion_ExtortionCooldownTable {
+  dbId String @id @unique @default(uuid())
+  id String
+  cooldown_timestamp Json
+}
+
+model extortion_ExtortionLog {
+  dbId String @id @unique @default(uuid())
+  tried_at String
+  success Boolean
+  amount_earned String
+  exp_earned String
+}
+
+model family_Family {
+  dbId String @id @unique @default(uuid())
+  id String
+  name String
+  money String
+  join_limit Int
+  description String
+  boss String
+  under_boss Json
+}
+
+model lotto_Lotto {
+  dbId String @id @unique @default(uuid())
+  id String
+  ticket_fee String
+  amount_collected String
+  result_in String
+  lotto_type String
+  status Json
+  winner Json[]
+  sold Json
+  winner_list String[]
+}
+
+model lotto_LottoIdHolder {
+  dbId String @id @unique @default(uuid())
+  id String
+  id_holder Json
+  active_lotto Json
+}
+
+model lotto_LottoSold {
+  dbId String @id @unique @default(uuid())
+  ticket_count String
+  amount String
+}
+
+model lotto_LottoStatusEnum {
+  dbId String @id @unique @default(uuid())
+}
+
+model lotto_PrevWinner {
+  dbId String @id @unique @default(uuid())
+  player_info_id Json
+  amount String
+}
+
+model marketplace_Effect {
+  dbId String @id @unique @default(uuid())
+  type String
+  for Int
+}
+
+model marketplace_MarketItem {
+  dbId String @id @unique @default(uuid())
+  id String
+  name String
+  local_name String
+  price String
+  accepted_token Json[]
+  description String
+  effect Json
+}
+
+model marketplace_MarketPlaceStore {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model perks_Perk {
+  dbId String @id @unique @default(uuid())
+  id String
+  name String
+  description String
+  expire_ts String
+  image String
+  life String
+  expected_expire_ts String
+}
+
+model perks_PerksMetadata {
+  dbId String @id @unique @default(uuid())
+  name String
+  description String
+  life String
+  image String
+}
+
+model perks_PerksMetadataHolder {
+  dbId String @id @unique @default(uuid())
+  id String
+  perks_price Json
+  efficiency_rate Json
+  faucet_holder String
+}
+
+model players_BattleEvent {
+  dbId String @id @unique @default(uuid())
+  attacker String
+  defender String
+  turf_perk String
+  distance String
+  experience_point String
+  cash String
+}
+
+model players_Config {
+  dbId String @id @unique @default(uuid())
+  id String
+  players Json
+}
+
+model players_CreatePlayerEvent {
+  dbId String @id @unique @default(uuid())
+  player_id String
+  sender String
+}
+
+model players_Experience {
+  dbId String @id @unique @default(uuid())
+  level String
+  next_level_at String
+  exp_point String
+}
+
+model players_GarrisonSummary {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model players_MoveUintEvent {
+  dbId String @id @unique @default(uuid())
+  from_turf String
+  to_turf String
+  player String
+}
+
+model players_Player {
+  dbId String @id @unique @default(uuid())
+  id String
+  headquarter_tile String
+  owned_location String[]
+  player_address String
+  player_name String
+  image_blob String
+  perks Json
+  has_headquarter Boolean
+}
+
+model players_PlayersIds {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model resources_BaseRate {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model resources_ClaimInfo {
+  dbId String @id @unique @default(uuid())
+  last_claimed_ts String
+  total_claimed String
+}
+
+model resources_Rates {
+  dbId String @id @unique @default(uuid())
+  resource_name String
+  rate String
+  max_capacity String
+}
+
+model resources_Resources {
+  dbId String @id @unique @default(uuid())
+  produced_by String
+  amount String
+  claim Json
+}
+
+model resources_UnitResource {
+  dbId String @id @unique @default(uuid())
+  money String
+  weapon String
+  influence String
+}
+
+model reward_RewardRegistry {
+  dbId String @id @unique @default(uuid())
+  id String
+  registry Json
+}
+
+model role_AdminCap {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model safe_GuessEnum {
+  dbId String @id @unique @default(uuid())
+}
+
+model safe_PrevStatus {
+  dbId String @id @unique @default(uuid())
+  prevMoney String
+  prevWonAddr Json
+}
+
+model safe_Safe {
+  dbId String @id @unique @default(uuid())
+  id String
+  cracked_safe Json
+  start_timestamp String
+  decreases_rate String
+  logs Json
+  money_won String
+  upper_bound String
+  lower_bound String
+  status Json
+  prev_player_status Json
+  min_threshold String
+  max_threshold String
+}
+
+model safe_SafeLog {
+  dbId String @id @unique @default(uuid())
+  tried_at String
+  number_guessed String
+  guess Json
+  cooldown_timestamp String
+}
+
+model safe_SafeMappingWithId {
+  dbId String @id @unique @default(uuid())
+  id String
+  safes Json
+}
+
+model safe_StatusEnum {
+  dbId String @id @unique @default(uuid())
+}
+
+model search_item_ResultSearchItem {
+  dbId String @id @unique @default(uuid())
+  money String
+  weapon String
+  influence String
+  exp String
+}
+
+model search_item_SearchDetailsTable {
+  dbId String @id @unique @default(uuid())
+  id String
+  cooldown_timestamp Json
+}
+
+model search_item_SearchItem {
+  dbId String @id @unique @default(uuid())
+  money String[]
+  weapon String[]
+  influence String[]
+}
+
+model search_item_SearchItemsValues {
+  dbId String @id @unique @default(uuid())
+  id String
+  items Json
+}
+
+model turf_information_Axis {
+  dbId String @id @unique @default(uuid())
+  top_left Json
+  right_left Json
+  center Json
+  index_center Json
+}
+
+model turf_information_AxisInfo {
+  dbId String @id @unique @default(uuid())
+  name String
+  x String
+  y String
+}
+
+model turf_information_DOFTurfsContainer {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model turf_information_IndividualPlayerBattleIDs {
+  dbId String @id @unique @default(uuid())
+  id String
+  defend String[]
+  attack String[]
+}
+
+model turf_information_Perk {
+  dbId String @id @unique @default(uuid())
+  perk_type String
+  amount String
+}
+
+model turf_information_PlayersBattleHistory {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model turf_information_SharedTurfIds {
+  dbId String @id @unique @default(uuid())
+  id String
+  free_turf_ids String[]
+  occupied_turfs_ids String[]
+}
+
+model turf_information_SharedTurfInformation {
+  dbId String @id @unique @default(uuid())
+  id String
+  turf_id String
+  axis Json
+  owned_by_player_id Json
+  garrison Json
+  coordinates Json[]
+  center String[]
+  neighbors String[]
+  perk Json
+}
+
+model turf_information_TurfBattleInformation {
+  dbId String @id @unique @default(uuid())
+  id String
+  attacker_id String
+  defender_id String
+  turf_id String
+  result Json
+}
+
+model units_service_AttackStats {
+  dbId String @id @unique @default(uuid())
+  read_health Int
+  current_health Int
+  read_attack Int
+}
+
+model units_service_RecruitCost {
+  dbId String @id @unique @default(uuid())
+  cost_type String
+  amount String
+}
+
+model units_service_Stat {
+  dbId String @id @unique @default(uuid())
+  health String
+  power String
+}
+
+model units_service_UnitStats {
+  dbId String @id @unique @default(uuid())
+  id String
+  name String
+  image String
+  stats Json
+  attack_stats Json
+  description String
+  recruit_cost Json[]
+  damage_modifier Json
+}
+
+model units_service_UnitsBaseStats {
+  dbId String @id @unique @default(uuid())
+  id String
+  available_units String[]
+}
+
+model vendetta_VENDETTA {
+  dbId String @id @unique @default(uuid())
+  dummy_field Boolean
+}
+
+model vendetta_dvd_Config {
+  dbId String @id @unique @default(uuid())
+  id String
+  player_registry Json
+}
+
+model vendetta_dvd_DVDMetadata {
+  dbId String @id @unique @default(uuid())
+  id String
+}
+
+model vendetta_dvd_VendettaDVD {
+  dbId String @id @unique @default(uuid())
+  id String
+  name String
+  description String
+  blob String
+}
+
+model vendetta_dvd_VendettaDVDEvent {
+  dbId String @id @unique @default(uuid())
+  object_id String
+  creator String
+  name String
+}
