@@ -1,3 +1,6 @@
+#!/usr/bin/env node
+
+import { Command } from 'commander';
 import axios from 'axios';
 import {
   extractEventTypes,
@@ -16,10 +19,18 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import { SuiClient } from './services/suiClient';
 
-async function main() {
-  const rpcUrl = 'https://fullnode.mainnet.sui.io:443';
-  const packageId =
-    '0x6f5e582ede61fe5395b50c4a449ec11479a54d7ff8e0158247adfda60d98970b';
+const NETWORK_RPC_URLS = {
+  mainnet: 'https://fullnode.mainnet.sui.io:443',
+  testnet: 'https://fullnode.testnet.sui.io:443',
+  devnet: 'https://fullnode.devnet.sui.io:443',
+} as const;
+
+type Network = keyof typeof NETWORK_RPC_URLS;
+
+const program = new Command();
+
+async function generateTypes(packageId: string, network: Network) {
+  const rpcUrl = NETWORK_RPC_URLS[network];
   const suiClient = new SuiClient(rpcUrl);
 
   try {
@@ -76,4 +87,36 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+program
+  .name('sui-events-processor')
+  .description(
+    'Generate TypeScript types and Prisma schema from Sui Move package events',
+  )
+  .version('1.0.0');
+
+program
+  .command('generate')
+  .description('Generate types from a Sui package')
+  .requiredOption('-p, --package <id>', 'Sui package ID')
+  .option('-n, --network <network>', 'Sui network to use', 'mainnet')
+  .action(async (options) => {
+    const network = options.network.toLowerCase();
+    if (!Object.keys(NETWORK_RPC_URLS).includes(network)) {
+      console.error(
+        `Invalid network. Must be one of: ${Object.keys(NETWORK_RPC_URLS).join(
+          ', ',
+        )}`,
+      );
+      process.exit(1);
+    }
+
+    try {
+      await generateTypes(options.package, network as Network);
+      console.log('Successfully generated types and schema!');
+    } catch (error) {
+      console.error('Failed to generate types:', error);
+      process.exit(1);
+    }
+  });
+
+program.parse();

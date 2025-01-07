@@ -1,7 +1,7 @@
 {
-  "name": "sui-events-fetcher",
+  "name": "sui-events-processor",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "devDependencies": {
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc && chmod +x dist/index.js",
     "start": "tsx src/index.ts",
     "start:debug": "tsx --inspect-brk src/index.ts"
   },
@@ -20,7 +21,11 @@
     "@mysten/sui": "^1.18.0",
     "@prisma/client": "^6.1.0",
     "axios": "^1.7.9",
+    "commander": "^13.0.0",
     "prisma": "^6.1.0"
   },
-  "type": "module"
+  "type": "commonjs",
+  "bin": {
+    "sui-events-processor": "./dist/index.js"
+  }
 }
