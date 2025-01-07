@@ -8,13 +8,13 @@ export const extractEventTypes = (
 
   for (const [moduleName, moduleBytecode] of Object.entries(bytecode)) {
     const lines = moduleBytecode.split('\n');
+    const packageId = extractPackageId(moduleBytecode);
 
     // Find all `event::emit` calls
     for (const line of lines) {
       const emitMatch = line.match(/event::emit<([\w_]+)>/);
       if (emitMatch) {
         const eventType = emitMatch[1];
-        const packageId = extractPackageId(moduleBytecode);
         eventTypes.add(`${packageId}::${moduleName}_${eventType}`);
       }
     }
@@ -53,6 +53,48 @@ export const filterEventStructsAndDependencies = async (
   const visited = new Set<string>();
   const externalStructsCache: Record<string, any> = {};
 
+  const loadExternalPackage = async (packageId: string) => {
+    if (!externalStructsCache[packageId]) {
+      const packageData = await suiClient.getNormalizedMoveModulesByPackage(
+        packageId,
+      );
+      externalStructsCache[packageId] = extractAllStructs(packageData);
+    }
+    return externalStructsCache[packageId];
+  };
+
+  const getStructFromPackage = async (
+    packageId: string,
+    type: string,
+    currentStructs: Record<string, any>,
+  ) => {
+    let struct = currentStructs[type];
+
+    if (!struct) {
+      const [module, _] = type.split('_');
+      const bytecode = await suiClient.getPackageBytecode(packageId);
+      const externalPackages = extractExternalPackages(bytecode);
+
+      if (externalPackages.has(module)) {
+        const externalPackageId = externalPackages.get(module)!;
+        const externalStructs = await loadExternalPackage(externalPackageId);
+        struct = externalStructs[type];
+      }
+    }
+
+    return struct;
+  };
+
+  const processStructField = async (fieldType: any) => {
+    if (fieldType.Struct || (fieldType.Vector && fieldType.Vector.Struct)) {
+      const structData = fieldType.Struct || fieldType.Vector.Struct;
+      const { address, module, name } = structData;
+      const nestedType = `${address}::${module}_${name}`;
+      const externalStructs = await loadExternalPackage(address);
+      await collectDependencies(nestedType, externalStructs);
+    }
+  };
+
   const collectDependencies = async (
     rawType: string,
     currentStructs: Record<string, any>,
@@ -61,72 +103,24 @@ export const filterEventStructsAndDependencies = async (
     visited.add(rawType);
 
     const [packageId, type] = rawType.split('::');
-
-    let struct = currentStructs[type];
-
-    // If not found in current structs, try to find in external packages
-    if (!struct) {
-      // Parse type name to get module and name (assuming format "module_name")
-      const bytecode = await suiClient.getPackageBytecode(packageId);
-      const externalPackages = extractExternalPackages(bytecode);
-      const [module, _] = type.split('_');
-      if (externalPackages.has(module)) {
-        const packageId = externalPackages.get(module)!;
-        // Load external package if not already cached
-        if (!externalStructsCache[packageId]) {
-          const packageData = await suiClient.getNormalizedMoveModulesByPackage(
-            packageId,
-          );
-          externalStructsCache[packageId] = extractAllStructs(packageData);
-        }
-        struct = externalStructsCache[packageId][type];
-        currentStructs = externalStructsCache[packageId];
-      }
-    }
+    const struct = await getStructFromPackage(packageId, type, currentStructs);
 
     if (struct) {
       result[type] = struct;
 
       if (struct.fields) {
-        // Process each field's dependencies
-        for (const field of struct.fields) {
-          const fieldType = field.type;
-
-          if (fieldType.Struct) {
-            const { address, module, name } = fieldType.Struct;
-            const nestedType = `${address}::${module}_${name}`;
-            if (!externalStructsCache[address]) {
-              const packageData =
-                await suiClient.getNormalizedMoveModulesByPackage(address);
-              externalStructsCache[address] = extractAllStructs(packageData);
-            }
-            await collectDependencies(
-              nestedType,
-              externalStructsCache[address],
-            );
-          } else if (fieldType.Vector && fieldType.Vector.Struct) {
-            const { address, module, name } = fieldType.Vector.Struct;
-            const nestedType = `${address}::${module}_${name}`;
-            if (!externalStructsCache[address]) {
-              const packageData =
-                await suiClient.getNormalizedMoveModulesByPackage(address);
-              externalStructsCache[address] = extractAllStructs(packageData);
-            }
-            await collectDependencies(
-              nestedType,
-              externalStructsCache[address],
-            );
-          }
-        }
+        await Promise.all(
+          struct.fields.map((field: any) => processStructField(field.type)),
+        );
       }
     }
   };
 
-  // Process all event types and their dependencies
-  for (const eventType of eventTypes) {
-    await collectDependencies(eventType, allStructs);
-  }
-
+  await Promise.all(
+    [...eventTypes].map((eventType) =>
+      collectDependencies(eventType, allStructs),
+    ),
+  );
   return result;
 };
 
