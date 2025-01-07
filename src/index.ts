@@ -1,6 +1,7 @@
 import axios from 'axios';
 import {
   extractEventTypes,
+  extractExternalPackages,
   filterEventStructsAndDependencies,
 } from './services/eventExtractor';
 import { cleanupDatabase } from './utils/databaseCleanup';
@@ -29,8 +30,7 @@ async function main() {
       packageId,
     );
 
-    const object = await suiClient.getObject(packageId);
-    const bytecode = object?.result?.data?.content?.disassembled;
+    const bytecode = await suiClient.getPackageBytecode(packageId);
 
     if (!bytecode) {
       console.error('No bytecode found');
@@ -38,7 +38,7 @@ async function main() {
     }
 
     // Extract event types from bytecode
-    const { eventTypes, externalPackages } = extractEventTypes(bytecode);
+    const eventTypes = extractEventTypes(bytecode);
 
     // Extract all structs from module data
     const allStructs = extractAllStructs(packageData);
@@ -47,12 +47,8 @@ async function main() {
     const eventStructs = await filterEventStructsAndDependencies(
       allStructs,
       eventTypes,
-      externalPackages,
       suiClient,
     );
-
-    console.dir(eventStructs, { depth: null });
-    return;
 
     // Generate interfaces
     const interfaces = generateTypeScriptDTOs(eventStructs);

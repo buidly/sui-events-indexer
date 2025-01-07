@@ -3,11 +3,32 @@ import { SuiClient } from './suiClient';
 
 export const extractEventTypes = (
   bytecode: Record<string, string>,
-): { eventTypes: Set<string>; externalPackages: Map<string, string> } => {
+): Set<string> => {
   const eventTypes = new Set<string>();
-  const externalPackages = new Map<string, string>();
 
   for (const [moduleName, moduleBytecode] of Object.entries(bytecode)) {
+    const lines = moduleBytecode.split('\n');
+
+    // Find all `event::emit` calls
+    for (const line of lines) {
+      const emitMatch = line.match(/event::emit<([\w_]+)>/);
+      if (emitMatch) {
+        const eventType = emitMatch[1];
+        const packageId = extractPackageId(moduleBytecode);
+        eventTypes.add(`${packageId}::${moduleName}_${eventType}`);
+      }
+    }
+  }
+
+  return eventTypes;
+};
+
+export const extractExternalPackages = (
+  bytecode: Record<string, string>,
+): Map<string, string> => {
+  const externalPackages = new Map<string, string>();
+
+  for (const [_, moduleBytecode] of Object.entries(bytecode)) {
     const lines = moduleBytecode.split('\n');
 
     // Collect all `use` statements for external packages
@@ -18,43 +39,36 @@ export const extractEventTypes = (
         externalPackages.set(moduleName, packageId);
       }
     }
-
-    // Find all `event::emit` calls
-    for (const line of lines) {
-      const emitMatch = line.match(/event::emit<([\w_]+)>/);
-      if (emitMatch) {
-        const eventType = emitMatch[1];
-        eventTypes.add(`${moduleName}_${eventType}`);
-      }
-    }
   }
 
-  return { eventTypes, externalPackages };
+  return externalPackages;
 };
 
 export const filterEventStructsAndDependencies = async (
   allStructs: Record<string, any>,
   eventTypes: Set<string>,
-  externalPackages: Map<string, string>,
   suiClient: SuiClient,
 ): Promise<Record<string, any>> => {
   const result: Record<string, any> = {};
   const visited = new Set<string>();
   const externalStructsCache: Record<string, any> = {};
 
-  const collectDependencies = async (type: string) => {
-    if (visited.has(type)) return;
-    visited.add(type);
+  const collectDependencies = async (rawType: string) => {
+    if (visited.has(rawType)) return;
+    visited.add(rawType);
+
+    const [packageId, type] = rawType.split('::');
 
     let struct = allStructs[type];
 
     // If not found in allStructs, try to find in external packages
     if (!struct) {
       // Parse type name to get module and name (assuming format "module_name")
+      const bytecode = await suiClient.getPackageBytecode(packageId);
+      const externalPackages = extractExternalPackages(bytecode);
       const [module, _] = type.split('_');
       if (externalPackages.has(module)) {
         const packageId = externalPackages.get(module)!;
-
         // Load external package if not already cached
         if (!externalStructsCache[packageId]) {
           const packageData = await suiClient.getNormalizedMoveModulesByPackage(
@@ -62,7 +76,6 @@ export const filterEventStructsAndDependencies = async (
           );
           externalStructsCache[packageId] = extractAllStructs(packageData);
         }
-
         struct = externalStructsCache[packageId][type];
       }
     }
@@ -76,12 +89,12 @@ export const filterEventStructsAndDependencies = async (
           const fieldType = field.type;
 
           if (fieldType.Struct) {
-            const { module, name } = fieldType.Struct;
-            const nestedType = `${module}_${name}`;
+            const { address, module, name } = fieldType.Struct;
+            const nestedType = `${address}::${module}_${name}`;
             await collectDependencies(nestedType);
           } else if (fieldType.Vector && fieldType.Vector.Struct) {
-            const { module, name } = fieldType.Vector.Struct;
-            const nestedType = `${module}_${name}`;
+            const { address, module, name } = fieldType.Vector.Struct;
+            const nestedType = `${address}::${module}_${name}`;
             await collectDependencies(nestedType);
           }
         }
@@ -95,4 +108,10 @@ export const filterEventStructsAndDependencies = async (
   }
 
   return result;
+};
+
+const extractPackageId = (bytecode: string): string => {
+  const match = bytecode.match(/module\s+([0-9a-f]+)\.(\w+)/);
+  if (!match) return '';
+  return match[1];
 };
