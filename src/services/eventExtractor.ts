@@ -53,15 +53,18 @@ export const filterEventStructsAndDependencies = async (
   const visited = new Set<string>();
   const externalStructsCache: Record<string, any> = {};
 
-  const collectDependencies = async (rawType: string) => {
+  const collectDependencies = async (
+    rawType: string,
+    currentStructs: Record<string, any>,
+  ) => {
     if (visited.has(rawType)) return;
     visited.add(rawType);
 
     const [packageId, type] = rawType.split('::');
 
-    let struct = allStructs[type];
+    let struct = currentStructs[type];
 
-    // If not found in allStructs, try to find in external packages
+    // If not found in current structs, try to find in external packages
     if (!struct) {
       // Parse type name to get module and name (assuming format "module_name")
       const bytecode = await suiClient.getPackageBytecode(packageId);
@@ -77,6 +80,7 @@ export const filterEventStructsAndDependencies = async (
           externalStructsCache[packageId] = extractAllStructs(packageData);
         }
         struct = externalStructsCache[packageId][type];
+        currentStructs = externalStructsCache[packageId];
       }
     }
 
@@ -91,11 +95,27 @@ export const filterEventStructsAndDependencies = async (
           if (fieldType.Struct) {
             const { address, module, name } = fieldType.Struct;
             const nestedType = `${address}::${module}_${name}`;
-            await collectDependencies(nestedType);
+            if (!externalStructsCache[address]) {
+              const packageData =
+                await suiClient.getNormalizedMoveModulesByPackage(address);
+              externalStructsCache[address] = extractAllStructs(packageData);
+            }
+            await collectDependencies(
+              nestedType,
+              externalStructsCache[address],
+            );
           } else if (fieldType.Vector && fieldType.Vector.Struct) {
             const { address, module, name } = fieldType.Vector.Struct;
             const nestedType = `${address}::${module}_${name}`;
-            await collectDependencies(nestedType);
+            if (!externalStructsCache[address]) {
+              const packageData =
+                await suiClient.getNormalizedMoveModulesByPackage(address);
+              externalStructsCache[address] = extractAllStructs(packageData);
+            }
+            await collectDependencies(
+              nestedType,
+              externalStructsCache[address],
+            );
           }
         }
       }
@@ -104,7 +124,7 @@ export const filterEventStructsAndDependencies = async (
 
   // Process all event types and their dependencies
   for (const eventType of eventTypes) {
-    await collectDependencies(eventType);
+    await collectDependencies(eventType, allStructs);
   }
 
   return result;
