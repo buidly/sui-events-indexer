@@ -36,7 +36,7 @@ export const mapNormalizedTypeToTypeScript = (
     return mapStructType(type.Struct);
   }
 
-  return 'Record<string, any>';
+  return 'Map<string, any>';
 };
 
 const mapPrimitiveType = (type: string): string => {
@@ -54,7 +54,7 @@ const mapPrimitiveType = (type: string): string => {
     case 'Address':
       return 'string';
     default:
-      return 'Record<string, any>';
+      return 'Map<string, any>';
   }
 };
 
@@ -84,21 +84,14 @@ const mapStructType = (struct: TypeReference): string => {
         }
         break;
       case KNOWN_TYPES.TABLE_MODULE:
-        if (typeArguments.length === 2) {
-          const [keyType, valueType] = typeArguments;
-          return `Record<${mapNormalizedTypeToTypeScript(
-            keyType,
-          )}, ${mapNormalizedTypeToTypeScript(valueType)}>`;
-        }
-        return 'Record<string, any>';
       case KNOWN_TYPES.VEC_MAP_MODULE:
         if (typeArguments.length === 2) {
           const [keyType, valueType] = typeArguments;
-          return `Record<${mapNormalizedTypeToTypeScript(
+          return `Map<${mapNormalizedTypeToTypeScript(
             keyType,
           )}, ${mapNormalizedTypeToTypeScript(valueType)}>`;
         }
-        return 'Record<string, any>';
+        return 'Map<string, any>';
       case KNOWN_TYPES.VEC_SET_MODULE:
         if (typeArguments.length === 1) {
           return `Set<${mapNormalizedTypeToTypeScript(typeArguments[0])}>`;
