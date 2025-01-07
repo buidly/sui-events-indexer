@@ -1,9 +1,9 @@
 import { DTOInterface } from '../types/dto-interface';
 import { mapNormalizedTypeToTypeScript } from '../utils/typeMapper';
 
-export const extractAllStructs = (response: any): Record<string, any> => {
+export const extractAllStructs = (response: any): Map<string, any> => {
   try {
-    const result: Record<string, any> = {};
+    const result = new Map<string, any>();
 
     for (const [moduleName, moduleData] of Object.entries(response.result)) {
       const module = moduleData as {
@@ -15,10 +15,10 @@ export const extractAllStructs = (response: any): Record<string, any> => {
       if (module.structs && Object.keys(module.structs).length > 0) {
         for (const [structName, structDef] of Object.entries(module.structs)) {
           const uniqueName = `${moduleName}_${structName}`;
-          result[uniqueName] = {
+          result.set(uniqueName, {
             type: 'struct',
             ...structDef,
-          };
+          });
         }
       }
 
@@ -26,10 +26,10 @@ export const extractAllStructs = (response: any): Record<string, any> => {
       if (module.enums && Object.keys(module.enums).length > 0) {
         for (const [enumName, enumDef] of Object.entries(module.enums)) {
           const uniqueName = `${moduleName}_${enumName}`;
-          result[uniqueName] = {
+          result.set(uniqueName, {
             type: 'enum',
             values: Object.keys(enumDef.variants),
-          };
+          });
         }
       }
     }
@@ -37,16 +37,16 @@ export const extractAllStructs = (response: any): Record<string, any> => {
     return result;
   } catch (error) {
     console.error('Error extracting structs and enums:', error);
-    return {};
+    return new Map();
   }
 };
 
 export const generateTypeScriptDTOs = (
-  items: Record<string, any>,
+  items: Map<string, any>,
 ): DTOInterface[] => {
   const interfaces: DTOInterface[] = [];
 
-  for (const [itemName, itemDef] of Object.entries(items)) {
+  for (const [itemName, itemDef] of items.entries()) {
     if (itemDef.type === 'enum') {
       const values = itemDef.values.map((value: string) => `  ${value}`);
       const content = `export enum ${itemName} {\n${values.join(',\n')}\n}`;
@@ -77,7 +77,7 @@ export const generateTypeScriptDTOs = (
     const typeRegex = /\b([a-z]\w*_[A-Z]\w+)\b/g;
     const matches = Array.from(dto.content.matchAll(typeRegex));
     const deps = new Set(
-      matches.map((m) => m[1]).filter((dep) => dep !== dto.name), // Don't import self
+      matches.map((m) => m[1]).filter((dep) => dep !== dto.name),
     );
 
     if (deps.size > 0) {

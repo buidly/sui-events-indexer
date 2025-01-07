@@ -2,7 +2,7 @@ import { extractAllStructs } from './dtoGenerator';
 import { SuiClient } from './suiClient';
 
 export const extractEventTypes = (
-  bytecode: Record<string, string>,
+  bytecode: Map<string, string>,
 ): Set<string> => {
   const eventTypes = new Set<string>();
 
@@ -24,7 +24,7 @@ export const extractEventTypes = (
 };
 
 export const extractExternalPackages = (
-  bytecode: Record<string, string>,
+  bytecode: Map<string, string>,
 ): Map<string, string> => {
   const externalPackages = new Map<string, string>();
 
@@ -45,30 +45,30 @@ export const extractExternalPackages = (
 };
 
 export const filterEventStructsAndDependencies = async (
-  allStructs: Record<string, any>,
+  allStructs: Map<string, any>,
   eventTypes: Set<string>,
   suiClient: SuiClient,
-): Promise<Record<string, any>> => {
-  const result: Record<string, any> = {};
+): Promise<Map<string, any>> => {
+  const result: Map<string, any> = new Map();
   const visited = new Set<string>();
-  const externalStructsCache: Record<string, any> = {};
+  const externalStructsCache: Map<string, any> = new Map();
 
   const loadExternalPackage = async (packageId: string) => {
-    if (!externalStructsCache[packageId]) {
+    if (!externalStructsCache.has(packageId)) {
       const packageData = await suiClient.getNormalizedMoveModulesByPackage(
         packageId,
       );
-      externalStructsCache[packageId] = extractAllStructs(packageData);
+      externalStructsCache.set(packageId, extractAllStructs(packageData));
     }
-    return externalStructsCache[packageId];
+    return externalStructsCache.get(packageId)!;
   };
 
   const getStructFromPackage = async (
     packageId: string,
     type: string,
-    currentStructs: Record<string, any>,
+    currentStructs: Map<string, any>,
   ) => {
-    let struct = currentStructs[type];
+    let struct = currentStructs.get(type);
 
     if (!struct) {
       const [module, _] = type.split('_');
@@ -97,7 +97,7 @@ export const filterEventStructsAndDependencies = async (
 
   const collectDependencies = async (
     rawType: string,
-    currentStructs: Record<string, any>,
+    currentStructs: Map<string, any>,
   ) => {
     if (visited.has(rawType)) return;
     visited.add(rawType);
@@ -106,7 +106,7 @@ export const filterEventStructsAndDependencies = async (
     const struct = await getStructFromPackage(packageId, type, currentStructs);
 
     if (struct) {
-      result[type] = struct;
+      result.set(type, struct);
 
       if (struct.fields) {
         await Promise.all(

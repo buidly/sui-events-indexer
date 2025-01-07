@@ -1,14 +1,14 @@
 import axios from 'axios';
 
 export class SuiClient {
-  private packageCache = new Map<string, Record<string, any>>();
+  private packageCache = new Map<string, Map<string, any>>();
   private packageBytecodeCache = new Map<string, any>();
 
   constructor(private rpcUrl: string) {}
 
   async getNormalizedMoveModulesByPackage(
     packageId: string,
-  ): Promise<Record<string, any>> {
+  ): Promise<Map<string, any>> {
     if (!this.packageCache.has(packageId)) {
       const response = await axios.post(this.rpcUrl, {
         jsonrpc: '2.0',
@@ -21,7 +21,7 @@ export class SuiClient {
     return this.packageCache.get(packageId)!;
   }
 
-  async getPackageBytecode(packageId: string): Promise<Record<string, string>> {
+  async getPackageBytecode(packageId: string): Promise<Map<string, string>> {
     if (!this.packageBytecodeCache.has(packageId)) {
       const response = await axios.post(this.rpcUrl, {
         jsonrpc: '2.0',
