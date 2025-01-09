@@ -1,40 +1,68 @@
+#!/usr/bin/env node
+
+import { Command } from 'commander';
 import axios from 'axios';
-import path from 'path';
-import fs from 'fs';
-import { execSync } from 'child_process';
+import {
+  extractEventTypes,
+  extractExternalPackages,
+  filterEventStructsAndDependencies,
+} from './services/eventExtractor';
+import { cleanupDatabase } from './utils/databaseCleanup';
 import {
   extractAllStructs,
   generateTypeScriptDTOs,
 } from './services/dtoGenerator';
-import { saveDTOsToFiles } from './utils/fileSystem';
+import path from 'path';
 import { generatePrismaSchema } from './utils/prismaSchemaGenerator';
-import { cleanupDatabase } from './utils/databaseCleanup';
+import { saveDTOsToFiles } from './utils/fileSystem';
+import { execSync } from 'child_process';
+import fs from 'fs';
+import { SuiClient } from './services/suiClient';
 
-async function main() {
-  const url = 'https://fullnode.devnet.sui.io:443';
+const NETWORK_RPC_URLS = {
+  mainnet: 'https://fullnode.mainnet.sui.io:443',
+  testnet: 'https://fullnode.testnet.sui.io:443',
+  devnet: 'https://fullnode.devnet.sui.io:443',
+} as const;
 
-  const requestBody = {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'sui_getNormalizedMoveModulesByPackage',
-    params: [
-      '0x816b07586fc507ee9c96e1faeba5713c0f96e0e4441b9a046db0f75a344e0984',
-    ],
-  };
+type Network = keyof typeof NETWORK_RPC_URLS;
+
+const program = new Command();
+
+async function generateTypes(packageId: string, network: Network) {
+  const rpcUrl = NETWORK_RPC_URLS[network];
+  const suiClient = new SuiClient(rpcUrl);
 
   try {
     // Clean up everything first
     cleanupDatabase();
 
-    // Fetch and generate TypeScript DTOs
-    const response = await axios.post(url, requestBody, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const packageData = await suiClient.getNormalizedMoveModulesByPackage(
+      packageId,
+    );
 
-    const structs = extractAllStructs(response.data);
-    const interfaces = generateTypeScriptDTOs(structs);
+    const bytecode = await suiClient.getPackageBytecode(packageId);
+
+    if (!bytecode) {
+      console.error('No bytecode found');
+      return;
+    }
+
+    // Extract event types from bytecode
+    const eventTypes = extractEventTypes(bytecode);
+
+    // Extract all structs from module data
+    const allStructs = extractAllStructs(packageData);
+
+    // Filter structs to only include event types and their dependencies
+    const eventStructs = await filterEventStructsAndDependencies(
+      allStructs,
+      eventTypes,
+      suiClient,
+    );
+
+    // Generate interfaces
+    const interfaces = generateTypeScriptDTOs(eventStructs);
     const outputDir = path.join(process.cwd(), 'generated');
     saveDTOsToFiles(interfaces, outputDir);
 
@@ -46,7 +74,7 @@ async function main() {
     );
     console.log('Generated Prisma schema');
 
-    // Apply schema directly without migrations
+    // Apply schema
     try {
       execSync('npx prisma generate', { stdio: 'inherit' });
       execSync('npx prisma db push --force-reset', { stdio: 'inherit' });
@@ -59,4 +87,36 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+program
+  .name('sui-events-processor')
+  .description(
+    'Generate TypeScript types and Prisma schema from Sui Move package events',
+  )
+  .version('1.0.0');
+
+program
+  .command('generate')
+  .description('Generate types from a Sui package')
+  .requiredOption('-p, --package <id>', 'Sui package ID')
+  .option('-n, --network <network>', 'Sui network to use', 'mainnet')
+  .action(async (options) => {
+    const network = options.network.toLowerCase();
+    if (!Object.keys(NETWORK_RPC_URLS).includes(network)) {
+      console.error(
+        `Invalid network. Must be one of: ${Object.keys(NETWORK_RPC_URLS).join(
+          ', ',
+        )}`,
+      );
+      process.exit(1);
+    }
+
+    try {
+      await generateTypes(options.package, network as Network);
+      console.log('Successfully generated types and schema!');
+    } catch (error) {
+      console.error('Failed to generate types:', error);
+      process.exit(1);
+    }
+  });
+
+program.parse();
