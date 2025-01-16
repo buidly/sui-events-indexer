@@ -1,23 +1,20 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import axios from 'axios';
-import {
-  extractEventTypes,
-  extractExternalPackages,
-  filterEventStructsAndDependencies,
-} from './services/eventExtractor';
-import { cleanupDatabase } from './utils/databaseCleanup';
+import fs from 'fs';
+import path from 'path';
 import {
   extractAllStructs,
   generateTypeScriptDTOs,
 } from './services/dtoGenerator';
-import path from 'path';
-import { generatePrismaSchema } from './utils/prismaSchemaGenerator';
-import { saveDTOsToFiles } from './utils/fileSystem';
-import { execSync } from 'child_process';
-import fs from 'fs';
+import {
+  extractEventTypes,
+  filterEventStructsAndDependencies,
+} from './services/eventExtractor';
+import { generateProject } from './services/projectGenerator';
 import { SuiClient } from './services/suiClient';
+import { saveDTOsToFiles } from './utils/fileSystem';
+import { generatePrismaSchema } from './utils/prismaSchemaGenerator';
 
 const NETWORK_RPC_URLS = {
   mainnet: 'https://fullnode.mainnet.sui.io:443',
@@ -29,14 +26,15 @@ type Network = keyof typeof NETWORK_RPC_URLS;
 
 const program = new Command();
 
-async function generateTypes(packageId: string, network: Network) {
+async function generateTypes(
+  packageId: string,
+  network: Network,
+  projectDir: string,
+) {
   const rpcUrl = NETWORK_RPC_URLS[network];
   const suiClient = new SuiClient(rpcUrl);
 
   try {
-    // Clean up everything first
-    cleanupDatabase();
-
     const packageData = await suiClient.getNormalizedMoveModulesByPackage(
       packageId,
     );
@@ -49,7 +47,10 @@ async function generateTypes(packageId: string, network: Network) {
     }
 
     // Extract event types from bytecode
-    const eventTypes = extractEventTypes(bytecode);
+    const eventTypes = extractEventTypes(bytecode, packageData);
+
+    // Get module names from event types
+    const moduleNames = new Set([...eventTypes].map((e) => e.moduleName));
 
     // Extract all structs from module data
     const allStructs = extractAllStructs(packageData);
@@ -63,25 +64,18 @@ async function generateTypes(packageId: string, network: Network) {
 
     // Generate interfaces
     const interfaces = generateTypeScriptDTOs(eventStructs);
-    const outputDir = path.join(process.cwd(), 'generated');
+    const outputDir = path.join(projectDir, 'types');
     saveDTOsToFiles(interfaces, outputDir);
 
-    // Generate and apply Prisma schema
+    // Generate Prisma schema
     const prismaSchema = generatePrismaSchema(outputDir);
     fs.writeFileSync(
-      path.join(process.cwd(), 'prisma', 'schema.prisma'),
+      path.join(projectDir, 'prisma', 'schema.prisma'),
       prismaSchema,
     );
     console.log('Generated Prisma schema');
 
-    // Apply schema
-    try {
-      execSync('npx prisma generate', { stdio: 'inherit' });
-      execSync('npx prisma db push --force-reset', { stdio: 'inherit' });
-      console.log('Applied database schema');
-    } catch (error) {
-      console.error('Error applying schema:', error);
-    }
+    // Don't run Prisma commands here
   } catch (error) {
     console.error('Error:', error);
   }
@@ -96,9 +90,11 @@ program
 
 program
   .command('generate')
-  .description('Generate types from a Sui package')
+  .description('Generate a new Express.js project with Sui event processing')
   .requiredOption('-p, --package <id>', 'Sui package ID')
   .option('-n, --network <network>', 'Sui network to use', 'mainnet')
+  .option('-o, --output <dir>', 'Output directory', process.cwd())
+  .option('--name <name>', 'Project name', 'sui-event-processor')
   .action(async (options) => {
     const network = options.network.toLowerCase();
     if (!Object.keys(NETWORK_RPC_URLS).includes(network)) {
@@ -111,10 +107,38 @@ program
     }
 
     try {
-      await generateTypes(options.package, network as Network);
-      console.log('Successfully generated types and schema!');
+      // First get the event types
+      const rpcUrl = NETWORK_RPC_URLS[network as Network];
+      const suiClient = new SuiClient(rpcUrl);
+      const packageData = await suiClient.getNormalizedMoveModulesByPackage(
+        options.package,
+      );
+      const bytecode = await suiClient.getPackageBytecode(options.package);
+      const eventTypes = extractEventTypes(bytecode, packageData);
+
+      // Then generate the project
+      const projectDir = await generateProject({
+        packageId: options.package,
+        projectName: options.name,
+        outputDir: options.output,
+        eventTypes,
+      });
+
+      // Finally generate types and schema
+      await generateTypes(options.package, network as Network, projectDir);
+
+      console.log(`
+Project generated successfully at ${projectDir}
+
+To get started:
+  cd ${projectDir}
+  npm install
+  docker-compose up -d
+  npm run db:setup:dev
+  npm run indexer
+`);
     } catch (error) {
-      console.error('Failed to generate types:', error);
+      console.error('Failed to generate project:', error);
       process.exit(1);
     }
   });
