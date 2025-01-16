@@ -1,6 +1,13 @@
 Sui Events Processor
 
-A CLI tool that automatically generates TypeScript types and Prisma schema from Sui Move package events. This tool helps bridge the gap between Sui Move events and TypeScript applications by providing type-safe interfaces and database schemas.
+A CLI tool that generates a complete event indexing solution for Sui Move packages. It automatically:
+
+- Creates TypeScript types from Move events
+- Generates a Prisma schema for event persistence
+- Scaffolds an event indexer with handlers for each event type
+- Sets up a REST API to query indexed events
+
+The generated project provides a production-ready setup for indexing and serving Sui events with type safety and database persistence.
 
 ## Features
 
