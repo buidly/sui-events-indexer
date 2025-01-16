@@ -30,7 +30,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc && chmod +x dist/index.js",
     "dev": "npm run build && tsx src/index.ts",
-    "dev:generate": "npm run build && sui-events-indexer generate",
+    "dev:generate": "npm run build && node dist/index.js generate",
     "start": "tsx src/index.ts",
     "start:debug": "tsx --inspect-brk src/index.ts"
   },
