@@ -66,17 +66,19 @@ npm run dev:generate -- \
 
 The generated project includes:
 
+```
 my-custom-project/
 ├── prisma/
-│ └── schema.prisma # Generated Prisma schema
-├── handlers/ # Event-specific handlers
-├── indexer/ # Event indexing logic
-├── types/ # Generated TypeScript types
-├── config.ts # Project configuration
-├── db.ts # Database client
-├── indexer.ts # Indexer entry point
-├── server.ts # Express API server
-└── docker-compose.yml # PostgreSQL setup
+│   └── schema.prisma     # Generated Prisma schema
+├── handlers/             # Event-specific handlers
+├── indexer/             # Event indexing logic
+├── types/               # Generated TypeScript types
+├── config.ts            # Project configuration
+├── db.ts                # Database client
+├── indexer.ts           # Indexer entry point
+├── server.ts            # Express API server
+└── docker-compose.yml   # PostgreSQL setup
+```
 
 ## Running the Project
 
