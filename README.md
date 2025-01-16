@@ -1,4 +1,4 @@
-Sui Events Processor
+Sui Events Indexer
 
 A CLI tool that generates a complete event indexing solution for Sui Move packages. It automatically:
 
