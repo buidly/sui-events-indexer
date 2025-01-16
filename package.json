@@ -1,7 +1,26 @@
 {
-  "name": "sui-events-processor",
+  "name": "sui-events-indexer",
   "version": "1.0.0",
+  "description": "A CLI tool that generates a complete event indexing solution for Sui Move packages",
   "main": "dist/index.js",
+  "bin": {
+    "sui-events-indexer": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "sui",
+    "move",
+    "blockchain",
+    "events",
+    "indexer",
+    "typescript",
+    "prisma"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
@@ -11,14 +30,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc && chmod +x dist/index.js",
     "dev": "npm run build && tsx src/index.ts",
-    "dev:generate": "npm run build && sui-events-processor generate",
+    "dev:generate": "npm run build && sui-events-indexer generate",
     "start": "tsx src/index.ts",
     "start:debug": "tsx --inspect-brk src/index.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "@mysten/sui": "^1.18.0",
     "@prisma/client": "^6.1.0",
@@ -26,8 +41,5 @@
     "commander": "^13.0.0",
     "prisma": "^6.1.0"
   },
-  "type": "commonjs",
-  "bin": {
-    "sui-events-processor": "./dist/index.js"
-  }
+  "type": "commonjs"
 }

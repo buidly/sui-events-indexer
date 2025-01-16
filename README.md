@@ -29,7 +29,7 @@ The generated project provides a production-ready setup for indexing and serving
 ## Installation
 
 ```bash
-npm install -g sui-events-processor
+npm install -g sui-events-indexer
 ```
 
 ### Options
@@ -43,7 +43,7 @@ npm install -g sui-events-processor
 ### Example
 
 ```bash
-sui-events-processor generate \
+sui-events-indexer generate \
 -p 0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809 \
 --name my-custom-project \
 --network mainnet \

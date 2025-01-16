@@ -82,7 +82,7 @@ async function generateTypes(
 }
 
 program
-  .name('sui-events-processor')
+  .name('sui-events-indexer')
   .description(
     'Generate TypeScript types and Prisma schema from Sui Move package events',
   )
