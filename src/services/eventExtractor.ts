@@ -1,10 +1,16 @@
 import { extractAllStructs } from './dtoGenerator';
 import { SuiClient } from './suiClient';
 
+export interface EventInfo {
+  eventType: string;
+  moduleName: string;
+}
+
 export const extractEventTypes = (
   bytecode: Map<string, string>,
-): Set<string> => {
-  const eventTypes = new Set<string>();
+  packageData: any,
+): Set<EventInfo> => {
+  const eventTypes = new Set<EventInfo>();
 
   for (const [moduleName, moduleBytecode] of Object.entries(bytecode)) {
     const lines = moduleBytecode.split('\n');
@@ -15,7 +21,13 @@ export const extractEventTypes = (
       const emitMatch = line.match(/event::emit<([\w_]+)>/);
       if (emitMatch) {
         const eventType = emitMatch[1];
-        eventTypes.add(`${packageId}::${moduleName}_${eventType}`);
+        // Check if this event type exists in the module's structs
+        if (packageData.result[moduleName]?.structs?.[eventType]) {
+          eventTypes.add({
+            eventType: `${packageId}::${moduleName}_${eventType}`,
+            moduleName,
+          });
+        }
       }
     }
   }
@@ -46,7 +58,7 @@ export const extractExternalPackages = (
 
 export const filterEventStructsAndDependencies = async (
   allStructs: Map<string, any>,
-  eventTypes: Set<string>,
+  eventTypes: Set<EventInfo>,
   suiClient: SuiClient,
 ): Promise<Map<string, any>> => {
   const result: Map<string, any> = new Map();
@@ -118,7 +130,7 @@ export const filterEventStructsAndDependencies = async (
 
   await Promise.all(
     [...eventTypes].map((eventType) =>
-      collectDependencies(eventType, allStructs),
+      collectDependencies(eventType.eventType, allStructs),
     ),
   );
   return result;

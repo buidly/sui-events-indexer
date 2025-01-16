@@ -175,9 +175,18 @@ const parseTypeScriptInterfaces = (
 export const generatePrismaSchema = (generatedDir: string): string => {
   const { models, enums } = parseTypeScriptInterfaces(generatedDir);
 
+  // Add the Cursor model for event tracking
+  const cursorModel = `
+model cursor {
+  id        String @id
+  eventSeq  String
+  txDigest  String
+}`;
+
   return [
     generateSchemaHeader(),
     generateEnumDefinitions(enums),
     generateModelDefinitions(models, enums),
+    cursorModel,
   ].join('\n');
 };
