@@ -1,4 +1,4 @@
-# Sui Events Processor
+Sui Events Processor
 
 A CLI tool that automatically generates TypeScript types and Prisma schema from Sui Move package events. This tool helps bridge the gap between Sui Move events and TypeScript applications by providing type-safe interfaces and database schemas.
 
@@ -8,27 +8,97 @@ A CLI tool that automatically generates TypeScript types and Prisma schema from 
 - 🗃️ Prisma schema generation
 - 🌐 Support for all Sui networks (mainnet, testnet, devnet)
 - 🔍 Intelligent dependency resolution for event types
+- 📦 Complete project scaffolding with Express API and event indexer
 - 🚀 Automatic database schema application
+- ⚡ Configurable polling intervals
+- 🔄 Event persistence with PostgreSQL
 
 ## Prerequisites
 
 - Node.js (v16 or higher)
 - npm or yarn
-- Prisma CLI
-- A running database (PostgreSQL recommended)
+- Docker and Docker Compose (for PostgreSQL)
 
-## How to Use (when it will be available on npm)
+## Installation
 
-npx sui-events-processor generate \
---package <package-id> \
---network <mainnet|testnet|devnet>
+```bash
+npm install -g sui-events-processor
+```
 
-## Example
+### Options
 
-npx sui-events-processor generate \
---package 0x8f611e924bcca2d5e18789da43683a89348fcea91ebd8624a24f416b5a532235 \
---network devnet
+- `-p, --package <id>` (required) - Package ID to index events from
+- `--name <name>` (required) - Project name
+- `-o, --output <dir>` - Output directory (default: current directory)
+- `-n, --network <network>` - Network to use (default: mainnet)
+- `-i, --interval <ms>` - Polling interval in milliseconds (default: 1000)
 
-## How to test locally
+### Example
 
-npm run dev:generate -- -p 0xbd8d4489782042c6fafad4de4bc6a5e0b84a43c6c00647ffd7062d1e2bb7549e --network mainnet
+```bash
+sui-events-processor generate \
+-p 0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809 \
+--name my-custom-project \
+--network mainnet \
+-i 1000
+```
+
+## Development
+
+To test locally:
+
+```bash
+npm run dev:generate -- \
+-p 0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809 \
+--name my-custom-project \
+--network mainnet \
+-i 1000
+```
+
+## Project Structure
+
+The generated project includes:
+
+my-custom-project/
+├── prisma/
+│ └── schema.prisma # Generated Prisma schema
+├── handlers/ # Event-specific handlers
+├── indexer/ # Event indexing logic
+├── types/ # Generated TypeScript types
+├── config.ts # Project configuration
+├── db.ts # Database client
+├── indexer.ts # Indexer entry point
+├── server.ts # Express API server
+└── docker-compose.yml # PostgreSQL setup
+
+## Running the Project
+
+1. Start the database:
+
+```bash
+docker compose up -d
+```
+
+2. Setup the database schema:
+
+```bash
+npm run db:setup:dev
+```
+
+3. Start the indexer:
+
+```bash
+npm run indexer:dev
+```
+
+4. Start the API server:
+
+```bash
+npm run server:dev
+```
+
+## API Endpoints
+
+The project automatically generates RESTful endpoints for each event type in your package. Each endpoint follows the pattern `/events/{module}/{event-name}` where the event name is converted to kebab-case format.
+
+Access your indexed events through these dynamically generated endpoints that match your package's event structure.

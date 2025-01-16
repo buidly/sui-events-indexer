@@ -11,6 +11,7 @@ interface ProjectConfig {
   projectName: string;
   outputDir: string;
   eventTypes: Set<EventInfo>;
+  pollingInterval?: number;
 }
 
 export const generateProject = async (config: ProjectConfig) => {
@@ -32,19 +33,22 @@ export const generateProject = async (config: ProjectConfig) => {
       'db:reset:dev':
         'npx prisma migrate reset --schema=./prisma/schema.prisma',
       'db:studio': 'npx prisma studio --schema=./prisma/schema.prisma',
-      indexer: 'npx ts-node ./indexer.ts',
+      'api:dev': 'npx ts-node server.ts',
+      indexer: 'npx ts-node indexer.ts',
+      'indexer:fast': 'POLLING_INTERVAL_MS=1000 npx ts-node indexer.ts',
+      'indexer:slow': 'POLLING_INTERVAL_MS=10000 npx ts-node indexer.ts',
     },
     dependencies: {
       '@mysten/sui': '^1.18.0',
       '@prisma/client': '^5.16.2',
       cors: '^2.8.5',
+      dotenv: '^16.0.3',
       express: '^4.18.2',
     },
     devDependencies: {
       '@types/cors': '^2.8.17',
       '@types/express': '^4.17.21',
       '@types/node': '^20.11.0',
-      concurrently: '^8.2.2',
       prisma: '^5.16.2',
       'ts-node': '^10.9.2',
       typescript: '^5.3.3',
@@ -87,7 +91,8 @@ export const generateProject = async (config: ProjectConfig) => {
   fs.writeFileSync(
     path.join(projectDir, '.env'),
     `DATABASE_URL="postgresql://prisma:prisma@localhost:5432/${projectName}?schema=public"\n` +
-      `PACKAGE_ID="${packageId}"\n`,
+      `PACKAGE_ID="${packageId}"\n` +
+      `POLLING_INTERVAL_MS="${config.pollingInterval || 1000}"\n`,
   );
 
   // Create docker-compose.yml
@@ -120,18 +125,11 @@ volumes:
     moduleEvents: EventInfo[],
   ) => `
 import { SuiEvent } from '@mysten/sui/client';
-import { prisma } from '../db';
-${moduleEvents
-  .map((e) => {
-    const eventName = e.eventType.split('::').pop() || e.eventType;
-    return `import type { ${eventName} } from '../types/${eventName}';`;
-  })
-  .join('\n')}
+import { prisma, Prisma } from '../db';
 
-export const handle${capitalizeFirstLetter(moduleName)}Events = async (
-  events: SuiEvent[],
-  type: string,
-) => {
+export const handle${capitalizeFirstLetter(
+    moduleName,
+  )}Events = async (events: SuiEvent[], type: string) => {
   const eventsByType = new Map<string, any[]>();
   
   for (const event of events) {
@@ -141,27 +139,29 @@ export const handle${capitalizeFirstLetter(moduleName)}Events = async (
     eventsByType.set(event.type, eventData);
   }
 
-  // Bulk create events by type
   await Promise.all(
     Array.from(eventsByType.entries()).map(async ([eventType, events]) => {
-      switch (eventType) {
+      const eventName = eventType.split('::').pop() || eventType;
+      switch (eventName) {
         ${moduleEvents
           .map((e) => {
             const eventName = e.eventType.split('::').pop() || e.eventType;
-            return `case '::${eventName.split('_').pop()}':
+            return `case '${eventName.split('_').pop()}':
           // TODO: handle ${eventName}
           await prisma.${eventName}.createMany({
-            data: events as ${eventName}[],
+            data: events as Prisma.${eventName}CreateManyInput[],
           });
+          console.log('Created ${eventName} events');
           break;`;
           })
           .join('\n        ')}
         default:
-          console.log('Unknown event type:', eventType);
+          console.log('Unknown event type:', eventName);
       }
-    })
+    }),
   );
-};`;
+};
+`;
 
   // Group events by module
   const eventsByModule = new Map<string, EventInfo[]>();
@@ -181,9 +181,11 @@ export const handle${capitalizeFirstLetter(moduleName)}Events = async (
 
   // Create config file
   const configContent = `
+import 'dotenv/config';
+
 export const CONFIG = {
   NETWORK: process.env.NETWORK || 'mainnet',
-  POLLING_INTERVAL_MS: 1000,
+  POLLING_INTERVAL_MS: parseInt(process.env.POLLING_INTERVAL_MS || '5000'),
   CONTRACT: {
     packageId: process.env.PACKAGE_ID || '',
   },
@@ -194,7 +196,7 @@ export const CONFIG = {
 
   // Create db.ts file
   const dbContent = `
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
@@ -205,6 +207,8 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+export { Prisma };
 `;
 
   fs.writeFileSync(path.join(projectDir, 'db.ts'), dbContent.trim());
@@ -235,7 +239,7 @@ export const getClient = (network: string): SuiClient => {
 
   // Create indexer.ts file (renamed from index.ts)
   const indexerContent = `
-import { setupListeners } from './events/event-indexer';
+import { setupListeners } from './indexer/event-indexer';
 
 async function main() {
   await setupListeners();
@@ -369,6 +373,50 @@ export const setupListeners = async () => {
   fs.writeFileSync(
     path.join(projectDir, 'indexer', 'event-indexer.ts'),
     eventTrackerContent.trim(),
+  );
+
+  // Add this function after the other content generators
+  const createServerContent = (moduleEvents: Set<EventInfo>) => `
+import express from 'express';
+import cors from 'cors';
+import { prisma } from './db';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Event query endpoints
+${[...moduleEvents]
+  .map((e) => {
+    const eventName = e.eventType.split('::').pop() || e.eventType;
+    const [module, eventType] = eventName.split('_');
+    const endpoint = eventType
+      .replace(/([A-Z])/g, '-$1')
+      .toLowerCase()
+      .replace(/^-/, '');
+
+    return `app.get('/events/${module}/${endpoint}', async (req, res) => {
+  try {
+    const events = await prisma.${eventName}.findMany();
+    res.json(events);
+  } catch (error) {
+    console.error('Failed to fetch ${eventName}:', error);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});`;
+  })
+  .join('\n\n')}
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(\`Server running on port \${PORT}\`);
+});
+`;
+
+  // Add this to the main generateProject function
+  fs.writeFileSync(
+    path.join(projectDir, 'server.ts'),
+    createServerContent(eventTypes),
   );
 
   return projectDir;

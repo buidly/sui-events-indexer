@@ -90,11 +90,12 @@ program
 
 program
   .command('generate')
-  .description('Generate a new Express.js project with Sui event processing')
-  .requiredOption('-p, --package <id>', 'Sui package ID')
-  .option('-n, --network <network>', 'Sui network to use', 'mainnet')
-  .option('-o, --output <dir>', 'Output directory', process.cwd())
-  .option('--name <name>', 'Project name', 'sui-event-processor')
+  .description('Generate a new event indexer project')
+  .requiredOption('-p, --package <id>', 'Package ID to index events from')
+  .requiredOption('--name <name>', 'Project name')
+  .option('-o, --output <dir>', 'Output directory', '.')
+  .option('-n, --network <network>', 'Network to use', 'mainnet')
+  .option('-i, --interval <ms>', 'Polling interval in milliseconds', '1000')
   .action(async (options) => {
     const network = options.network.toLowerCase();
     if (!Object.keys(NETWORK_RPC_URLS).includes(network)) {
@@ -122,6 +123,7 @@ program
         projectName: options.name,
         outputDir: options.output,
         eventTypes,
+        pollingInterval: parseInt(options.interval),
       });
 
       // Finally generate types and schema
