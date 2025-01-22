@@ -145,18 +145,13 @@ export const handle${capitalizeFirstLetter(
           .map((e) => {
             const eventName = e.eventType.split('::').pop() || e.eventType;
 
-            const [module, rawTypeName] = eventName.split('-');
-            const modulePart = capitalizeFirstLetter(snakeToCamelCase(module));
-            // If type doesn't already include the module name, prepend it
-            const typeName = rawTypeName.startsWith(modulePart)
-              ? rawTypeName
-              : `${modulePart}${rawTypeName}`;
+            const [_, rawTypeName] = eventName.split('-');
             return `case '${rawTypeName}':
           // TODO: handle ${rawTypeName}
-          await prisma.${lowerCaseFirstLetter(typeName)}.createMany({
-            data: events as Prisma.${typeName}CreateManyInput[],
+          await prisma.${lowerCaseFirstLetter(rawTypeName)}.createMany({
+            data: events as Prisma.${rawTypeName}CreateManyInput[],
           });
-          console.log('Created ${typeName} events');
+          console.log('Created ${rawTypeName} events');
           break;`;
           })
           .join('\n        ')}
@@ -397,26 +392,24 @@ ${[...moduleEvents]
   .map((e) => {
     const eventName = e.eventType.split('::').pop() || e.eventType;
     const [module, eventType] = eventName.split('-');
-    const modulePart = capitalizeFirstLetter(snakeToCamelCase(module));
-    // If type doesn't already include the module name, prepend it
-    const typeName = eventType.startsWith(modulePart)
-      ? eventType
-      : `${modulePart}${eventType}`;
+    const modulePart = module.replace(/_/g, '-').toLowerCase();
 
     const endpoint = eventType
       .replace(/([A-Z])/g, '-$1')
       .toLowerCase()
       .replace(/^-/, '');
 
-    return `app.get('/events/${module}/${endpoint}', async (req, res) => {
-  try {
-    const events = await prisma.${lowerCaseFirstLetter(typeName)}.findMany();
-    res.json(events);
-  } catch (error) {
-    console.error('Failed to fetch ${eventName}:', error);
-    res.status(500).json({ error: 'Failed to fetch events' });
-  }
-});`;
+    return `app.get('/events/${modulePart}/${endpoint}', async (req, res) => {
+      try {
+        const events = await prisma.${lowerCaseFirstLetter(
+          eventType,
+        )}.findMany();
+        res.json(events);
+      } catch (error) {
+        console.error('Failed to fetch ${eventName}:', error);
+        res.status(500).json({ error: 'Failed to fetch events' });
+      }
+    });`;
   })
   .join('\n\n')}
 

@@ -48,12 +48,7 @@ export const generateTypeScriptDTOs = (
   const interfaces: DTOInterface[] = [];
 
   for (const [itemName, itemDef] of items.entries()) {
-    const [module, rawTypeName] = itemName.split('-');
-    const modulePart = capitalizeFirstLetter(snakeToCamelCase(module));
-    // If type doesn't already include the module name, prepend it
-    const typeName = rawTypeName.startsWith(modulePart)
-      ? rawTypeName
-      : `${modulePart}${rawTypeName}`;
+    const [_, typeName] = itemName.split('-');
 
     if (itemDef.type === 'enum') {
       const values = itemDef.values.map((value: string) => `  ${value}`);
@@ -65,20 +60,9 @@ export const generateTypeScriptDTOs = (
     } else if (itemDef.type === 'struct') {
       if (itemDef.fields) {
         const fields = itemDef.fields.map((field: any) => {
-          let tsType = mapNormalizedTypeToTypeScript(field.type);
-
-          // Handle array types separately
-          const isArray = tsType.endsWith('[]');
-          const baseType = isArray ? tsType.slice(0, -2) : tsType;
-
-          if (!['string', 'number', 'boolean', 'bigint'].includes(baseType)) {
-            const transformedType = capitalizeFirstLetter(
-              snakeToCamelCase(baseType.split('-').pop() || baseType),
-            );
-            tsType = isArray ? `${transformedType}[]` : transformedType;
-          }
-
-          return `  ${field.name}: ${tsType};`;
+          return `  ${field.name}: ${mapNormalizedTypeToTypeScript(field.type)
+            .split('-')
+            .pop()};`;
         });
 
         const content = `export interface ${typeName} {\n${fields.join(
@@ -102,7 +86,9 @@ export const generateTypeScriptDTOs = (
         .filter(
           (dep) =>
             dep !== dto.name &&
-            !['string', 'boolean', 'number', 'bigint'].includes(dep),
+            !['string', 'boolean', 'number', 'bigint', 'Map', 'Set'].includes(
+              dep,
+            ),
         ),
     );
 
