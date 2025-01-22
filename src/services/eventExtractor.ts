@@ -1,3 +1,4 @@
+import { KNOWN_TYPES } from '../utils/typeMapper';
 import { extractAllStructs } from './dtoGenerator';
 import { SuiClient } from './suiClient';
 
@@ -24,7 +25,7 @@ export const extractEventTypes = (
         // Check if this event type exists in the module's structs
         if (packageData.result[moduleName]?.structs?.[eventType]) {
           eventTypes.add({
-            eventType: `${packageId}::${moduleName}_${eventType}`,
+            eventType: `${packageId}::${moduleName}-${eventType}`,
             moduleName,
           });
         }
@@ -83,7 +84,7 @@ export const filterEventStructsAndDependencies = async (
     let struct = currentStructs.get(type);
 
     if (!struct) {
-      const [module, _] = type.split('_');
+      const [module, _] = type.split('-');
       const bytecode = await suiClient.getPackageBytecode(packageId);
       const externalPackages = extractExternalPackages(bytecode);
 
@@ -101,7 +102,10 @@ export const filterEventStructsAndDependencies = async (
     if (fieldType.Struct || (fieldType.Vector && fieldType.Vector.Struct)) {
       const structData = fieldType.Struct || fieldType.Vector.Struct;
       const { address, module, name } = structData;
-      const nestedType = `${address}::${module}_${name}`;
+      if (module === KNOWN_TYPES.OBJECT_MODULE) {
+        return;
+      }
+      const nestedType = `${address}::${module}-${name}`;
       const externalStructs = await loadExternalPackage(address);
       await collectDependencies(nestedType, externalStructs);
     }

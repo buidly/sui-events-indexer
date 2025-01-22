@@ -11,7 +11,7 @@ export interface TypeReference {
 const MOVE_STDLIB_ADDRESS = '0x1';
 const SUI_FRAMEWORK_ADDRESS = '0x2';
 
-const KNOWN_TYPES = {
+export const KNOWN_TYPES = {
   OBJECT_MODULE: 'object',
   STRING_MODULE: 'string',
   ASCII_MODULE: 'ascii',
@@ -100,5 +100,5 @@ const mapStructType = (struct: TypeReference): string => {
     }
   }
 
-  return `${module}_${name}`;
+  return `${module}-${name}`;
 };
