@@ -1,10 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { EventInfo } from './eventExtractor';
-
-const capitalizeFirstLetter = (str: string): string => {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-};
+import { capitalizeFirstLetter, lowerCaseFirstLetter } from '../utils/naming';
+import { snakeToCamelCase } from '../utils/naming';
 
 interface ProjectConfig {
   packageId: string;
@@ -128,7 +126,7 @@ import { SuiEvent } from '@mysten/sui/client';
 import { prisma, Prisma } from '../db';
 
 export const handle${capitalizeFirstLetter(
-    moduleName,
+    snakeToCamelCase(moduleName),
   )}Events = async (events: SuiEvent[], type: string) => {
   const eventsByType = new Map<string, any[]>();
   
@@ -146,12 +144,19 @@ export const handle${capitalizeFirstLetter(
         ${moduleEvents
           .map((e) => {
             const eventName = e.eventType.split('::').pop() || e.eventType;
-            return `case '${eventName.split('_').pop()}':
-          // TODO: handle ${eventName}
-          await prisma.${eventName}.createMany({
-            data: events as Prisma.${eventName}CreateManyInput[],
+
+            const [module, rawTypeName] = eventName.split('-');
+            const modulePart = capitalizeFirstLetter(snakeToCamelCase(module));
+            // If type doesn't already include the module name, prepend it
+            const typeName = rawTypeName.startsWith(modulePart)
+              ? rawTypeName
+              : `${modulePart}${rawTypeName}`;
+            return `case '${rawTypeName}':
+          // TODO: handle ${rawTypeName}
+          await prisma.${lowerCaseFirstLetter(typeName)}.createMany({
+            data: events as Prisma.${typeName}CreateManyInput[],
           });
-          console.log('Created ${eventName} events');
+          console.log('Created ${typeName} events');
           break;`;
           })
           .join('\n        ')}
@@ -174,7 +179,7 @@ export const handle${capitalizeFirstLetter(
   // Create handlers for each module
   eventsByModule.forEach((events, moduleName) => {
     fs.writeFileSync(
-      path.join(projectDir, 'handlers', `${moduleName}.ts`),
+      path.join(projectDir, 'handlers', `${snakeToCamelCase(moduleName)}.ts`),
       createHandlerContent(moduleName, events),
     );
   });
@@ -260,8 +265,8 @@ ${[...eventsByModule.keys()]
   .map(
     (name) =>
       `import { handle${capitalizeFirstLetter(
-        name,
-      )}Events } from '../handlers/${name}';`,
+        snakeToCamelCase(name),
+      )}Events } from '../handlers/${snakeToCamelCase(name)}';`,
   )
   .join('\n')}
 
@@ -289,7 +294,9 @@ const EVENTS_TO_TRACK: EventTracker[] = [
         package: CONFIG.CONTRACT.packageId,
       },
     },
-    callback: handle${capitalizeFirstLetter(moduleName)}Events,
+    callback: handle${capitalizeFirstLetter(
+      snakeToCamelCase(moduleName),
+    )}Events,
   }`,
     )
     .join(',\n  ')}
@@ -389,7 +396,13 @@ app.use(express.json());
 ${[...moduleEvents]
   .map((e) => {
     const eventName = e.eventType.split('::').pop() || e.eventType;
-    const [module, eventType] = eventName.split('_');
+    const [module, eventType] = eventName.split('-');
+    const modulePart = capitalizeFirstLetter(snakeToCamelCase(module));
+    // If type doesn't already include the module name, prepend it
+    const typeName = eventType.startsWith(modulePart)
+      ? eventType
+      : `${modulePart}${eventType}`;
+
     const endpoint = eventType
       .replace(/([A-Z])/g, '-$1')
       .toLowerCase()
@@ -397,7 +410,7 @@ ${[...moduleEvents]
 
     return `app.get('/events/${module}/${endpoint}', async (req, res) => {
   try {
-    const events = await prisma.${eventName}.findMany();
+    const events = await prisma.${lowerCaseFirstLetter(typeName)}.findMany();
     res.json(events);
   } catch (error) {
     console.error('Failed to fetch ${eventName}:', error);

@@ -78,7 +78,7 @@ export const generateTypeScriptDTOs = (
             tsType = isArray ? `${transformedType}[]` : transformedType;
           }
 
-          return `  ${snakeToCamelCase(field.name)}: ${tsType};`;
+          return `  ${field.name}: ${tsType};`;
         });
 
         const content = `export interface ${typeName} {\n${fields.join(
