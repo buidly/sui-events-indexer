@@ -1,6 +1,6 @@
 {
   "name": "sui-events-indexer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A CLI tool that generates a complete event indexing solution for Sui Move packages",
   "main": "dist/index.js",
   "bin": {
