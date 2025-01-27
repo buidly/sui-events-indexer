@@ -102,7 +102,7 @@ export const filterEventStructsAndDependencies = async (
     if (fieldType.Struct || (fieldType.Vector && fieldType.Vector.Struct)) {
       const structData = fieldType.Struct || fieldType.Vector.Struct;
       const { address, module, name } = structData;
-      console.log(address, module, name);
+
       if (
         module === KNOWN_TYPES.OBJECT_MODULE ||
         module === KNOWN_TYPES.STRING_MODULE ||
