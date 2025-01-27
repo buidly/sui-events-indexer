@@ -97,13 +97,13 @@ npm run db:setup:dev
 3. Start the indexer:
 
 ```bash
-npm run indexer:dev
+npm run indexer
 ```
 
 4. Start the API server:
 
 ```bash
-npm run server:dev
+npm run api:dev
 ```
 
 ## API Endpoints
