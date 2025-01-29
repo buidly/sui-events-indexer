@@ -49,9 +49,6 @@ async function generateTypes(
     // Extract event types from bytecode
     const eventTypes = extractEventTypes(bytecode, packageData);
 
-    // Get module names from event types
-    const moduleNames = new Set([...eventTypes].map((e) => e.moduleName));
-
     // Extract all structs from module data
     const allStructs = extractAllStructs(packageData);
 

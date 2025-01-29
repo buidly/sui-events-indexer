@@ -1,6 +1,6 @@
 {
   "name": "sui-events-indexer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A CLI tool that generates a complete event indexing solution for Sui Move packages",
   "main": "dist/index.js",
   "bin": {
@@ -19,7 +19,7 @@
     "typescript",
     "prisma"
   ],
-  "author": "Your Name",
+  "author": "Buidly",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.5",
@@ -27,7 +27,6 @@
     "typescript": "^5.7.2"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc && chmod +x dist/index.js",
     "dev": "npm run build && tsx src/index.ts",
     "dev:generate": "npm run build && node dist/index.js generate",

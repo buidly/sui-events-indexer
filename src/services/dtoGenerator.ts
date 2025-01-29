@@ -1,4 +1,5 @@
 import { DTOInterface } from '../types/dto-interface';
+import { capitalizeFirstLetter, snakeToCamelCase } from '../utils/naming';
 import { mapNormalizedTypeToTypeScript } from '../utils/typeMapper';
 
 export const extractAllStructs = (response: any): Map<string, any> => {
@@ -14,7 +15,7 @@ export const extractAllStructs = (response: any): Map<string, any> => {
       // Handle structs
       if (module.structs && Object.keys(module.structs).length > 0) {
         for (const [structName, structDef] of Object.entries(module.structs)) {
-          const uniqueName = `${moduleName}_${structName}`;
+          const uniqueName = `${moduleName}-${structName}`;
           result.set(uniqueName, {
             type: 'struct',
             ...structDef,
@@ -25,7 +26,7 @@ export const extractAllStructs = (response: any): Map<string, any> => {
       // Handle enums
       if (module.enums && Object.keys(module.enums).length > 0) {
         for (const [enumName, enumDef] of Object.entries(module.enums)) {
-          const uniqueName = `${moduleName}_${enumName}`;
+          const uniqueName = `${moduleName}-${enumName}`;
           result.set(uniqueName, {
             type: 'enum',
             values: Object.keys(enumDef.variants),
@@ -47,25 +48,28 @@ export const generateTypeScriptDTOs = (
   const interfaces: DTOInterface[] = [];
 
   for (const [itemName, itemDef] of items.entries()) {
+    const [_, typeName] = itemName.split('-');
+
     if (itemDef.type === 'enum') {
       const values = itemDef.values.map((value: string) => `  ${value}`);
-      const content = `export enum ${itemName} {\n${values.join(',\n')}\n}`;
+      const content = `export enum ${typeName} {\n${values.join(',\n')}\n}`;
       interfaces.push({
-        name: itemName,
+        name: typeName,
         content,
       });
     } else if (itemDef.type === 'struct') {
       if (itemDef.fields) {
         const fields = itemDef.fields.map((field: any) => {
-          const tsType = mapNormalizedTypeToTypeScript(field.type);
-          return `  ${field.name}: ${tsType};`;
+          return `  ${field.name}: ${mapNormalizedTypeToTypeScript(field.type)
+            .split('-')
+            .pop()};`;
         });
 
-        const content = `export interface ${itemName} {\n${fields.join(
+        const content = `export interface ${typeName} {\n${fields.join(
           '\n',
         )}\n}`;
         interfaces.push({
-          name: itemName,
+          name: typeName,
           content,
         });
       }
@@ -74,10 +78,18 @@ export const generateTypeScriptDTOs = (
 
   // Add imports based on type usage in the interface
   interfaces.forEach((dto) => {
-    const typeRegex = /\b([a-z]\w*_[A-Z]\w+)\b/g;
+    const typeRegex = /\b([A-Z][a-zA-Z0-9]*(?:[A-Z][a-zA-Z0-9]*)*)\b/g;
     const matches = Array.from(dto.content.matchAll(typeRegex));
     const deps = new Set(
-      matches.map((m) => m[1]).filter((dep) => dep !== dto.name),
+      matches
+        .map((m) => m[1])
+        .filter(
+          (dep) =>
+            dep !== dto.name &&
+            !['string', 'boolean', 'number', 'bigint', 'Map', 'Set'].includes(
+              dep,
+            ),
+        ),
     );
 
     if (deps.size > 0) {
